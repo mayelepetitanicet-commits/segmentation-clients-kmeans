@@ -1,0 +1,774 @@
+% ==========================================================================
+% Rapport : Segmentation de clients d'un centre commercial par K-Means
+% Auteur  : Petit MAYELE
+% Compilation : pdflatex rapport_segmentation.tex   (deux fois, pour la table des matieres)
+%
+% Dossier attendu :
+%   rapport/
+%   |-- rapport_segmentation.tex
+%   `-- figures/
+%       |-- 01_distributions.png
+%       |-- 02_boxplots.png
+%       |-- 03_correlations.png
+%       |-- 04_pairplot.png
+%       |-- 05_revenu_vs_score.png
+%       |-- 06_coude_silhouette.png
+%       |-- 07_clusters.png
+%       |-- 08_boxplots_clusters.png
+%       |-- deploy_01_jeunes_budget.png
+%       |-- deploy_02_vip.png
+%       |-- deploy_03_seniors.png
+%       `-- deploy_04_en_ligne.png
+% ==========================================================================
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Encodage, langue, polices ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[french]{babel}
+\usepackage{microtype}
+
+% ---------- Mise en page ----------
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{setspace}
+\setstretch{1.1}
+\emergencystretch=2em
+\usepackage{enumitem}
+\setlist{itemsep=2pt,topsep=4pt}
+\usepackage{fancyhdr}
+
+% ---------- Figures et tableaux ----------
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\captionsetup{font=small,labelfont=bf}
+
+% ---------- Code ----------
+\usepackage{listings}
+
+% ---------- Couleurs et liens ----------
+\definecolor{bleu}{RGB}{20,80,160}
+\definecolor{grisclair}{gray}{0.95}
+\usepackage[colorlinks=true,linkcolor=bleu,urlcolor=bleu,citecolor=bleu]{hyperref}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{grisclair},
+  frame=single,
+  rulecolor=\color{gray},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  literate={é}{{\'e}}1 {è}{{\`e}}1 {à}{{\`a}}1 {ê}{{\^e}}1 {ç}{{\c c}}1
+           {ô}{{\^o}}1 {î}{{\^i}}1 {û}{{\^u}}1 {â}{{\^a}}1 {ù}{{\`u}}1,
+}
+
+% ---------- Insertion d'image avec repli si le fichier est absent ----------
+% Usage : \img[largeur]{chemin/vers/image.png}
+\newcommand{\img}[2][0.92\textwidth]{%
+  \IfFileExists{#2}%
+    {\includegraphics[width=#1]{#2}}%
+    {\fbox{\parbox{\dimexpr#1-2\fboxsep-2\fboxrule\relax}{\centering\vspace{1.5cm}\textit{Image manquante :}\\\texttt{\detokenize{#2}}\vspace{1.5cm}}}}%
+}
+
+% ---------- En-tetes ----------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Segmentation de clients par K-Means}
+\fancyhead[R]{\small Petit MAYELE}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{Segmentation de clients par K-Means}
+\author{Petit MAYELE}
+\date{25 octobre 2026}
+
+\begin{document}
+
+% ==========================================================================
+% PAGE DE GARDE
+% ==========================================================================
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+\vspace*{1cm}
+{\large Université de Kinshasa (UNIKIN)\par}
+\vspace{0.3cm}
+{\normalsize Master 2 en Data Science et Intelligence Artificielle\par}
+\vspace{2.5cm}
+\rule{\textwidth}{1.2pt}\\[0.6cm]
+{\Huge\bfseries Segmentation de clients\\d'un centre commercial\\par la méthode K-Means\par}
+\vspace{0.4cm}
+{\Large De l'analyse des données au déploiement d'une application web\par}
+\rule{\textwidth}{1.2pt}\\[2cm]
+{\Large\textbf{Petit MAYELE}\par}
+\vspace{0.3cm}
+{\normalsize Étudiant en Master 2, Data Science et Intelligence Artificielle\par}
+\vspace{2cm}
+\begingroup\small
+\begin{tabular}{@{}r@{\hspace{6pt}}p{9.2cm}@{}}
+  \textbf{Application en ligne :} & \url{https://segmentation-clients-kmeans.streamlit.app}\\[3pt]
+  \textbf{Dépôt GitHub :} & \url{https://github.com/mayelepetitanicet-commits/segmentation-clients-kmeans}\\[3pt]
+  \textbf{Dépôt GitLab :} & \url{https://gitlab.com/mayelepetitanicet/segmentation-customer}\\
+\end{tabular}
+\endgroup
+\vfill
+{\normalsize Kinshasa, le 25 octobre 2026\par}
+\end{titlepage}
+
+% ==========================================================================
+% RESUME
+% ==========================================================================
+\section*{Résumé}
+\addcontentsline{toc}{section}{Résumé}
+
+Ce rapport présente un projet complet de data science : la segmentation des clients d'un centre commercial à l'aide de l'algorithme K-Means. À partir d'un jeu de 200 clients décrits par leur âge, leur revenu annuel et leur score de dépenses, six segments homogènes ont été identifiés. Le choix du nombre de groupes repose sur la méthode du coude et sur le score de silhouette, qui désignent tous deux $k=6$ comme meilleur compromis (silhouette de $0{,}428$). Chaque segment a ensuite été interprété, nommé et associé à une action marketing.
+
+Le modèle et son normaliseur ont été sauvegardés, puis intégrés à une application web développée avec Streamlit et déployée en ligne sur Streamlit Community Cloud. Le code est versionné sur GitLab et GitHub. Le rapport décrit la méthode, les résultats, les limites et les perspectives du travail.
+
+\medskip
+\noindent\textbf{Mots-clés :} segmentation, clustering, K-Means, standardisation, silhouette, Streamlit, déploiement, marketing.
+
+\tableofcontents
+\listoffigures
+\listoftables
+\newpage
+
+% ==========================================================================
+% 1. PRESENTATION DE L'AUTEUR
+% ==========================================================================
+\section{Présentation de l'auteur}
+
+\subsection{Profil}
+Je suis \textbf{Petit MAYELE}, étudiant en \textbf{Master 2 en Data Science et Intelligence Artificielle} à l'Université de Kinshasa (UNIKIN). Passionné par l'analyse de données et l'intelligence artificielle, je m'intéresse à toute la chaîne de traitement de la donnée : collecte, nettoyage, modélisation, visualisation et mise à disposition des résultats pour la prise de décision. Curieux, autonome et rigoureux, je cherche à intégrer des projets innovants alliant data science et technologies intelligentes.
+
+\subsection{Parcours académique et formations}
+\begin{itemize}
+  \item \textbf{2021--2025} : cycle de licence (système LMD) à l'Université de Kinshasa, faculté des sciences et technologies, département de mathématiques, statistiques et informatique.
+  \item \textbf{Depuis 2026} : Master en Data Science et Intelligence Artificielle, Université de Kinshasa.
+  \item \textbf{Certification} en base du métier de technicien informatique, Institut de religion UNIKIN campus (juillet à septembre 2024).
+  \item \textbf{Formation} complète en reporting (création de tableaux de bord interactifs avec Excel avancé), Future Skills Academy, avec certification.
+  \item \textbf{Certification} en graphisme et infographie, Paulin Design (2023).
+  \item \textbf{Formation} en anglais, Institut de religion UNIKIN campus (2025).
+\end{itemize}
+
+\subsection{Expériences professionnelles et projets}
+\begin{itemize}
+  \item \textbf{2021--2023}, EGECR MSON (maison de vente de friperie, Limete, Kinshasa) : informaticien, caissier et comptable ; conception de la base de données d'enregistrement des produits ; création des supports de l'entreprise (logo, affiches, portfolio, invitations marketing, facturation).
+  \item \textbf{Depuis 2024}, CELTECH (structure d'étudiants comptants, UNIKIN) : designer et infographe.
+  \item \textbf{Septembre à octobre 2025}, stage académique d'informaticien au Centre technique et pratique Lucky (Kinshasa, Gombe).
+  \item \textbf{Travail de fin d'études} : réalisation d'une barrière intelligente pour la détection et l'accès de véhicules, cas de l'UNIKIN.
+  \item \textbf{Projet de laboratoire} : application de gestion des enregistrements des étudiants de la faculté des sciences et technologies.
+\end{itemize}
+
+\subsection{Compétences techniques}
+\begin{center}
+\begin{tabularx}{0.95\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Domaine} & \textbf{Outils et technologies}\\
+\midrule
+Programmation & Python, PHP\\
+Data science et IA & pandas, scikit-learn, TensorFlow, Streamlit\\
+Bases de données & SQL Server, MySQL, Oracle, Access\\
+Visualisation et reporting & Power BI, Excel avancé, tableaux de bord interactifs\\
+Conception & UI/UX, infographie\\
+Langues & Lingala et kikongo (très bien), français (courant), anglais technique (bien)\\
+\bottomrule
+\end{tabularx}
+\captionof{table}{Compétences techniques de l'auteur.}
+\end{center}
+
+\subsection{Contacts et liens}
+\begin{center}
+\begin{tabularx}{0.95\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Support} & \textbf{Adresse}\\
+\midrule
+E-mail & \href{mailto:mayelepetitanicet@gmail.com}{mayelepetitanicet@gmail.com}\\
+Téléphone / WhatsApp & +243 819 060 014\\
+Application déployée & \url{https://segmentation-clients-kmeans.streamlit.app}\\
+GitHub (profil) & \url{https://github.com/mayelepetitanicet-commits}\\
+GitHub (projet) & \url{https://github.com/mayelepetitanicet-commits/segmentation-clients-kmeans}\\
+GitLab (profil) & \url{https://gitlab.com/mayelepetitanicet}\\
+GitLab (projet) & \url{https://gitlab.com/mayelepetitanicet/segmentation-customer}\\
+% TODO : remplacer par l'adresse complete de votre profil LinkedIn
+LinkedIn & PETIT MAYELE PM\\
+Instagram & \href{https://www.instagram.com/indefinymayelePM}{@indefinymayelePM}\\
+X (Twitter) & \href{https://x.com/indefinypm012}{@indefinypm012}\\
+\bottomrule
+\end{tabularx}
+\captionof{table}{Contacts et liens de l'auteur.}
+\end{center}
+
+% ==========================================================================
+% 2. CONTEXTE ET OBJECTIFS
+% ==========================================================================
+\section{Contexte et objectifs}
+
+Un centre commercial accueille des clients très différents : étudiants, familles, personnes âgées, cadres à hauts revenus. Proposer la même offre à tous est peu efficace. La \textbf{segmentation de clientèle} consiste à regrouper les clients qui se ressemblent afin d'adapter les actions commerciales à chaque groupe.
+
+\paragraph{Objectif principal.} Regrouper les clients en segments homogènes, par exemple « revenus élevés et dépenses élevées » ou « jeunes, revenus modestes, dépenses élevées », afin de proposer des actions marketing adaptées.
+
+\paragraph{Objectifs secondaires.}
+\begin{itemize}
+  \item mettre en œuvre une démarche de data science complète et reproductible ;
+  \item justifier le choix du nombre de segments par des critères quantitatifs ;
+  \item interpréter les segments en termes métier ;
+  \item mettre le modèle à disposition via une interface web de démonstration.
+\end{itemize}
+
+% ==========================================================================
+% 3. ENVIRONNEMENT ET ORGANISATION
+% ==========================================================================
+\section{Environnement technique et organisation}
+
+\subsection{Outils}
+\begin{itemize}
+  \item \textbf{Python 3.11}, dans un environnement \textbf{Anaconda} dédié nommé \texttt{segmentation} ;
+  \item \textbf{JupyterLab} pour l'analyse (notebook \texttt{01\_segmentation.ipynb}) ;
+  \item \textbf{pandas}, \textbf{numpy}, \textbf{matplotlib} et \textbf{seaborn} pour la manipulation et la visualisation ;
+  \item \textbf{scikit-learn} pour la standardisation, le K-Means et les métriques ;
+  \item \textbf{joblib} pour la sauvegarde du modèle ;
+  \item \textbf{Streamlit} pour l'application web ;
+  \item \textbf{Git}, \textbf{GitLab} (dépôt principal) et \textbf{GitHub} (dépôt de déploiement).
+\end{itemize}
+
+\subsection{Structure du dépôt}
+\begin{lstlisting}
+segmentation-customer/
+|-- app/            application Streamlit (app.py)
+|-- data/           donnees brutes et clients segmentes
+|   |-- Mall_Customers.xlsx
+|   |-- Mall_Customers.csv
+|   `-- clients_segmentes.csv
+|-- models/         modele K-Means et scaler sauvegardes
+|   |-- kmeans.joblib
+|   `-- scaler.joblib
+|-- notebooks/      analyse complete (01_segmentation.ipynb)
+|-- requirements.txt        dependances minimales (deploiement)
+|-- requirements-dev.txt    dependances completes (analyse)
+`-- README.md
+\end{lstlisting}
+
+\subsection{Gestion de version}
+Le code est versionné avec Git. Le dépôt principal est hébergé sur GitLab. Un second dépôt, public, est hébergé sur GitHub : il est relié à Streamlit Community Cloud, qui redéploie l'application à chaque mise à jour. Les deux dépôts reçoivent les mêmes commits grâce à deux commandes d'envoi (\texttt{git push} et \texttt{git push github main}).
+
+% ==========================================================================
+% 4. DONNEES
+% ==========================================================================
+\section{Les données}
+
+\subsection{Description}
+Le jeu de données, inspiré du jeu public \textit{Mall Customers} (Kaggle), contient \textbf{200 clients} et \textbf{7 variables}. La version utilisée comporte deux colonnes catégorielles supplémentaires par rapport à la version classique : le niveau d'études et la situation familiale.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{6.5cm}@{}}
+\toprule
+\textbf{Variable} & \textbf{Type} & \textbf{Rôle dans le projet}\\
+\midrule
+\texttt{CustomerID} & entier & identifiant, non utilisé\\
+\texttt{Gender} & catégorielle & profilage des segments\\
+\texttt{Age} & entier & \textbf{clustering}\\
+\texttt{Education} & catégorielle & profilage des segments\\
+\texttt{Marital Status} & catégorielle & profilage des segments\\
+\texttt{Annual Income (k\$)} & entier & \textbf{clustering}\\
+\texttt{Spending Score (1-100)} & entier & \textbf{clustering}\\
+\bottomrule
+\end{tabular}
+\caption{Variables du jeu de données et rôle de chacune.}
+\end{table}
+
+\subsection{Contrôle de qualité}
+Les contrôles effectués au chargement montrent des données propres :
+\begin{itemize}
+  \item 200 lignes et 7 colonnes ;
+  \item \textbf{aucune valeur manquante} et \textbf{aucun doublon} ;
+  \item un espace parasite à la fin du nom de la colonne \texttt{Education}, corrigé par un nettoyage des noms de colonnes ;
+  \item bornes cohérentes : âge de 18 à 70 ans, revenu de 15 à 137 k\$, score de dépenses de 1 à 99.
+\end{itemize}
+
+Les variables catégorielles se répartissent comme suit (effectifs) :
+\begin{itemize}
+  \item \texttt{Gender} : 112 femmes, 88 hommes ;
+  \item \texttt{Education} : Graduate 67, High School 40, Uneducated 31, Unknown 26, College 17, Doctorate 11, Post-Graduate 8 ;
+  \item \texttt{Marital Status} : Married 112, Single 61, Unknown 15, Divorced 12.
+\end{itemize}
+
+\paragraph{Remarque sur la modalité \textit{Unknown}.} Elle représente une information non renseignée et non un profil de client : elle est conservée comme catégorie à part, car ces colonnes ne servent qu'au profilage et non à la construction des segments.
+
+% ==========================================================================
+% 5. EXPLORATION
+% ==========================================================================
+\section{Exploration visuelle}
+
+\subsection{Distributions}
+Les trois variables numériques présentent des formes différentes. L'âge est étalé vers les âges élevés avec un pic autour de 30 à 35 ans. Le revenu est également étalé vers la droite, avec une petite queue au-delà de 100 k\$. Le score de dépenses est centré autour de 50 avec une dispersion plus large. Aucune de ces formes ne gêne l'emploi du K-Means.
+
+\begin{figure}[H]
+\centering
+\img{figures/01_distributions.png}
+\caption{Distribution de l'âge, du revenu annuel et du score de dépenses.}
+\label{fig:distributions}
+\end{figure}
+
+\subsection{Valeurs extrêmes}
+Le seul point isolé apparaît sur le revenu, vers 137 k\$. Il s'agit d'un client réel à haut revenu et non d'une erreur : il est conservé et rejoindra un segment à hauts revenus. Un unique point sur 200 n'influence pas sensiblement les centres des groupes.
+
+\begin{figure}[H]
+\centering
+\img{figures/02_boxplots.png}
+\caption{Boîtes à moustaches des trois variables numériques.}
+\label{fig:boxplots}
+\end{figure}
+
+\subsection{Corrélations}
+La seule relation notable lie l'âge et le score de dépenses (coefficient de $-0{,}33$) : les clients plus jeunes tendent à avoir un score plus élevé. Les autres corrélations sont proches de zéro (âge et revenu : $-0{,}01$ ; revenu et score : $0{,}01$). Chaque variable apporte donc une information distincte, ce qui est favorable au clustering.
+
+\begin{figure}[H]
+\centering
+\img[0.6\textwidth]{figures/03_correlations.png}
+\caption{Matrice de corrélation des variables numériques.}
+\label{fig:correlations}
+\end{figure}
+
+\subsection{Relations entre variables}
+\begin{figure}[H]
+\centering
+\img{figures/04_pairplot.png}
+\caption{Nuages de points croisés des trois variables, colorés selon le genre.}
+\label{fig:pairplot}
+\end{figure}
+
+Le genre ne sépare visuellement aucun groupe : les points des deux genres sont mélangés partout. Il est donc réservé au profilage.
+
+\subsection{Revenu et score de dépenses}
+Le nuage de points entre le revenu et le score de dépenses est le graphique le plus parlant du projet. Il laisse apparaître plusieurs zones denses : un bloc central compact (revenu et dépenses moyens) et quatre régions périphériques (revenu faible ou élevé, dépenses faibles ou élevées). Cette lecture bidimensionnelle suggérait cinq groupes ; l'ajout de l'âge, analysé plus loin, conduit à un sixième.
+
+\begin{figure}[H]
+\centering
+\img[0.75\textwidth]{figures/05_revenu_vs_score.png}
+\caption{Revenu annuel en fonction du score de dépenses.}
+\label{fig:revenu-score}
+\end{figure}
+
+% ==========================================================================
+% 6. PREPARATION
+% ==========================================================================
+\section{Préparation des données : standardisation}
+
+Le K-Means repose sur des distances euclidiennes. Les trois variables n'ont pas la même échelle : sans correction, le revenu (de 15 à 137) et le score (de 1 à 99) pèseraient davantage que l'âge (de 18 à 70). Les trois variables sont donc centrées et réduites avec \texttt{StandardScaler} : chacune a ensuite une moyenne de 0 et un écart-type de 1.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+& \multicolumn{3}{c}{\textbf{Avant}} & \multicolumn{3}{c}{\textbf{Après}}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Variable} & moyenne & écart-type & min -- max & moyenne & écart-type & min -- max\\
+\midrule
+Âge & 38,85 & 13,97 & 18 -- 70 & 0 & 1 & $-1{,}50$ -- $2{,}24$\\
+Revenu (k\$) & 60,56 & 26,26 & 15 -- 137 & 0 & 1 & $-1{,}74$ -- $2{,}92$\\
+Score de dépenses & 50,20 & 25,82 & 1 -- 99 & 0 & 1 & $-1{,}91$ -- $1{,}89$\\
+\bottomrule
+\end{tabular}
+\caption{Statistiques des variables avant et après standardisation.}
+\label{tab:scaling}
+\end{table}
+
+Le normaliseur ajusté sur les données est sauvegardé avec le modèle : il servira à transformer les profils saisis dans l'application web de la même manière que les données d'entraînement.
+
+% ==========================================================================
+% 7. CHOIX DE K
+% ==========================================================================
+\section{Choix du nombre de segments}
+
+Deux critères complémentaires ont été calculés pour $k$ de 2 à 10, avec 10 initialisations par valeur de $k$ et une graine aléatoire fixée (\texttt{random\_state=42}) :
+\begin{itemize}
+  \item la \textbf{méthode du coude} : l'inertie (somme des carrés des distances des points à leur centre) diminue toujours quand $k$ augmente ; on cherche le point où la baisse ralentit nettement ;
+  \item le \textbf{score de silhouette}, compris entre $-1$ et $1$ : plus il est élevé, mieux les groupes sont séparés.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}rrr@{}}
+\toprule
+$k$ & \textbf{Inertie} & \textbf{Silhouette}\\
+\midrule
+2 & 389,4 & 0,335\\
+3 & 295,2 & 0,358\\
+4 & 205,2 & 0,404\\
+5 & 168,2 & 0,417\\
+\rowcolor{grisclair} \textbf{6} & \textbf{133,9} & \textbf{0,428}\\
+7 & 117,0 & 0,417\\
+8 & 103,9 & 0,408\\
+9 & 93,1 & 0,418\\
+10 & 82,4 & 0,407\\
+\bottomrule
+\end{tabular}
+\caption{Inertie et score de silhouette selon le nombre de groupes $k$.}
+\label{tab:choix-k}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\img{figures/06_coude_silhouette.png}
+\caption{Méthode du coude (à gauche) et score de silhouette (à droite).}
+\label{fig:coude-silhouette}
+\end{figure}
+
+\paragraph{Décision.} Le score de silhouette atteint son maximum à $k=6$ ($0{,}428$) et la courbe du coude s'aplatit à partir de cette valeur. Les deux critères convergent. L'écart avec $k=5$ et $k=7$ reste cependant faible (environ $0{,}01$) : aucune valeur ne s'impose avec netteté, et l'interprétation métier a servi de contrôle complémentaire. Le choix retenu est \textbf{$k=6$}. La lecture du nuage revenu--score suggérait $k=5$ ; l'ajout de l'âge est ce qui fait apparaître un sixième groupe.
+
+% ==========================================================================
+% 8. ENTRAINEMENT
+% ==========================================================================
+\section{Entraînement du modèle}
+
+Le K-Means a été entraîné avec $k=6$ sur les trois variables standardisées. Le score de silhouette obtenu est de $0{,}428$. Les centres des groupes, ramenés aux unités d'origine, sont présentés ci-dessous.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+\textbf{Cluster} & \textbf{Âge moyen} & \textbf{Revenu moyen (k\$)} & \textbf{Score moyen} & \textbf{Effectif}\\
+\midrule
+0 & 56,3 & 54,3 & 49,1 & 45\\
+1 & 26,8 & 57,1 & 48,1 & 39\\
+2 & 41,9 & 88,9 & 17,0 & 33\\
+3 & 32,7 & 86,5 & 82,1 & 39\\
+4 & 25,0 & 25,3 & 77,6 & 23\\
+5 & 45,5 & 26,3 & 19,4 & 21\\
+\midrule
+\textbf{Total} & & & & \textbf{200}\\
+\bottomrule
+\end{tabular}
+\caption{Profil moyen et effectif de chaque cluster (unités d'origine).}
+\label{tab:centres}
+\end{table}
+
+Les effectifs sont équilibrés (de 21 à 45 clients) : aucun groupe n'est minuscule ni dominant.
+
+\begin{figure}[H]
+\centering
+\img{figures/07_clusters.png}
+\caption{Les six clusters : revenu contre score de dépenses (à gauche) et âge contre score de dépenses (à droite).}
+\label{fig:clusters}
+\end{figure}
+
+\paragraph{Apport de l'âge.} Dans le plan revenu--score, les clusters 0 et 1 se recouvrent presque entièrement. Dans le plan âge--score, ils se séparent nettement : le cluster 1 regroupe les 18 à 40 ans, le cluster 0 les 40 à 70 ans. C'est la différence avec la version classique à cinq groupes.
+
+Le modèle et le normaliseur sont enregistrés dans les fichiers \texttt{models/kmeans.joblib} et \texttt{models/scaler.joblib}.
+
+% ==========================================================================
+% 9. INTERPRETATION
+% ==========================================================================
+\section{Interprétation des segments}
+
+\subsection{Distribution des variables par segment}
+\begin{figure}[H]
+\centering
+\img{figures/08_boxplots_clusters.png}
+\caption{Âge, revenu annuel et score de dépenses pour chaque cluster.}
+\label{fig:boxplots-clusters}
+\end{figure}
+
+Chaque cluster se distingue clairement sur au moins une variable. Les noms attribués aux segments sont les suivants.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}cp{4.2cm}X@{}}
+\toprule
+\textbf{Cluster} & \textbf{Segment} & \textbf{Profil}\\
+\midrule
+0 & Seniors modérés & Clients de 40 à 70 ans (médiane d'environ 54 ans), revenu et dépenses moyens.\\
+1 & Jeunes adultes modérés & Clients de 18 à 40 ans (médiane d'environ 26 ans), revenu et dépenses moyens.\\
+2 & Aisés économes & Revenu élevé (environ 89 k\$), dépenses très faibles.\\
+3 & Aisés dépensiers (VIP) & Revenu élevé (environ 87 k\$), dépenses très élevées.\\
+4 & Jeunes dépensiers à petit budget & Jeunes (environ 25 ans), petit revenu, dépenses élevées.\\
+5 & Budget serré, dépenses faibles & Petit revenu, dépenses faibles, âges très étalés.\\
+\bottomrule
+\end{tabularx}
+\caption{Description et nom des six segments.}
+\label{tab:segments}
+\end{table}
+
+Deux nuances méritent d'être signalées. Les clusters 0 et 1 ne diffèrent que par l'âge : c'est le découpage le moins net du modèle. Le cluster 5 est hétérogène en âge (d'environ 20 à 67 ans) : ce sont le petit revenu et les faibles dépenses qui le définissent, non l'âge.
+
+\subsection{Profilage par variables non utilisées}
+Le genre, le niveau d'études et la situation familiale n'ont pas servi au clustering ; ils permettent de profiler les segments a posteriori. Les pourcentages ci-dessous sont calculés par cluster (chaque ligne totalise environ 100~\%).
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}rrr@{}}
+\toprule
+\textbf{Cluster} & \textbf{Femmes (\%)} & \textbf{Hommes (\%)}\\
+\midrule
+0 & 58 & 42\\
+1 & 64 & 36\\
+2 & 42 & 58\\
+3 & 54 & 46\\
+4 & 57 & 43\\
+5 & 62 & 38\\
+\bottomrule
+\end{tabular}
+\caption{Répartition du genre par cluster.}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}rrrrrrrr@{}}
+\toprule
+\textbf{Cluster} & College & Doctorate & Graduate & High School & Post-Grad. & Uneducated & Unknown\\
+\midrule
+0 & 7 & 4 & 36 & 22 & 4 & 9 & 18\\
+1 & 10 & 10 & 38 & 18 & 3 & 10 & 10\\
+2 & 6 & 3 & 27 & 27 & 6 & 27 & 3\\
+3 & 10 & 5 & 33 & 15 & 5 & 21 & 10\\
+4 & 9 & 4 & 30 & 22 & 0 & 9 & 26\\
+5 & 10 & 5 & 33 & 14 & 5 & 19 & 14\\
+\bottomrule
+\end{tabular}
+\caption{Niveau d'études par cluster (en \%).}
+\end{table}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+\textbf{Cluster} & Divorced & Married & Single & Unknown\\
+\midrule
+0 & 4 & 56 & 31 & 9\\
+1 & 8 & 54 & 36 & 3\\
+2 & 6 & 58 & 33 & 3\\
+3 & 10 & 59 & 26 & 5\\
+4 & 0 & 57 & 26 & 17\\
+5 & 5 & 52 & 29 & 14\\
+\bottomrule
+\end{tabular}
+\caption{Situation familiale par cluster (en \%).}
+\end{table}
+
+\paragraph{Lecture.} Ces trois variables ne différencient pas nettement les segments. Le cluster 2 penche vers les hommes (58~\%), le cluster 1 vers les femmes (64~\%), et les clusters 2, 3 et 5 comptent davantage de personnes sans instruction que les autres. Avec 21 à 45 clients par groupe, ces écarts reposent sur de petits effectifs et ne doivent pas être sur-interprétés. La situation familiale est quasiment identique d'un segment à l'autre. Les valeurs \textit{Unknown} (par exemple 26~\% pour le niveau d'études du cluster 4) reflètent des informations non renseignées, non une caractéristique des clients. Les recommandations reposent donc uniquement sur l'âge, le revenu et le score de dépenses.
+
+% ==========================================================================
+% 10. RECOMMANDATIONS
+% ==========================================================================
+\section{Recommandations marketing}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}p{3.6cm}rX@{}}
+\toprule
+\textbf{Segment} & \textbf{Effectif} & \textbf{Action proposée}\\
+\midrule
+Aisés dépensiers (VIP) & 39 & Programme de fidélité premium, avant-premières, services exclusifs.\\
+Jeunes dépensiers à petit budget & 23 & Promotions, paiement échelonné, offres étudiantes, communication sur les réseaux sociaux.\\
+Seniors modérés & 45 & Services de confort, horaires calmes, offres bien-être.\\
+Jeunes adultes modérés & 39 & Offres mode et loisirs, parrainage, événements en centre commercial.\\
+Aisés économes & 33 & Offres ciblées et valeur perçue pour les attirer vers le haut de gamme.\\
+Budget serré, dépenses faibles & 21 & Bons plans et soldes, sans investissement marketing lourd.\\
+\bottomrule
+\end{tabularx}
+\caption{Actions marketing proposées pour chaque segment.}
+\label{tab:reco}
+\end{table}
+
+Le segment des \textbf{aisés économes} est commercialement le plus intéressant : il combine un revenu élevé et de faibles dépenses, donc la plus grande marge de progression. Ces recommandations sont des \textbf{hypothèses à tester}, par exemple par des campagnes pilotes, et non des preuves de causalité.
+
+% ==========================================================================
+% 11. APPLICATION WEB ET DEPLOIEMENT
+% ==========================================================================
+\section{Application web et déploiement}
+
+\subsection{Principe}
+Une application web de démonstration a été développée avec \textbf{Streamlit}. L'utilisateur règle trois curseurs (âge, revenu annuel, score de dépenses) puis clique sur « Identifier le segment ». L'application standardise le profil avec le normaliseur sauvegardé, prédit le cluster avec le modèle K-Means et affiche le nom du segment, sa description et l'action marketing associée. Un volet permet aussi de consulter les 200 clients segmentés, avec un nuage de points et le tableau complet.
+
+\subsection{Extrait du code}
+\begin{lstlisting}[language=Python]
+@st.cache_resource
+def charger_modeles():
+    kmeans = joblib.load(RACINE / "models" / "kmeans.joblib")
+    scaler = joblib.load(RACINE / "models" / "scaler.joblib")
+    return kmeans, scaler
+
+kmeans, scaler = charger_modeles()
+
+age = col1.slider("Age", 18, 80, 35)
+revenu = col2.slider("Revenu annuel (k$)", 10, 150, 60)
+score = col3.slider("Score de depenses (1-100)", 1, 100, 50)
+
+if st.button("Identifier le segment", type="primary"):
+    client = pd.DataFrame([[age, revenu, score]], columns=FEATURES)
+    cluster = int(kmeans.predict(scaler.transform(client))[0])
+    nom, description, action = SEGMENTS[cluster]
+\end{lstlisting}
+
+\subsection{Chaîne de déploiement}
+\begin{enumerate}
+  \item Le code est développé et testé en local avec la commande \texttt{streamlit run app/app.py} (adresse locale \texttt{http://localhost:8501}).
+  \item Le fichier \texttt{requirements.txt} est réduit aux cinq dépendances nécessaires (streamlit, pandas, numpy, scikit-learn, joblib), avec leurs versions exactes. La version de scikit-learn doit être identique à celle qui a sauvegardé le modèle, afin que le chargement fonctionne sur le serveur.
+  \item Le projet est poussé sur GitLab (dépôt principal), puis sur un dépôt GitHub public.
+  \item L'application est déployée sur \textbf{Streamlit Community Cloud} à partir du dépôt GitHub (branche \texttt{main}, fichier \texttt{app/app.py}, Python 3.11).
+  \item Chaque mise à jour du dépôt GitHub déclenche un redéploiement automatique.
+\end{enumerate}
+
+L'application est accessible à l'adresse \url{https://segmentation-clients-kmeans.streamlit.app}.
+
+\subsection{Tests de l'application déployée}
+Quatre profils ont été saisis dans l'application déployée pour vérifier son fonctionnement.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}rrrl@{}}
+\toprule
+\textbf{Âge} & \textbf{Revenu (k\$)} & \textbf{Score} & \textbf{Segment affiché}\\
+\midrule
+40 & 33 & 69 & Jeunes dépensiers à petit budget\\
+62 & 112 & 88 & Aisés dépensiers (VIP)\\
+73 & 82 & 50 & Seniors modérés\\
+54 & 102 & 84 & Aisés dépensiers (VIP)\\
+\bottomrule
+\end{tabular}
+\caption{Profils saisis pour tester l'application et segments obtenus.}
+\label{tab:tests}
+\end{table}
+
+Le premier profil illustre le fonctionnement du modèle : le client de 40 ans est affecté au segment dont le centre est le plus proche dans l'espace des trois variables standardisées, même si son âge dépasse l'âge moyen de ce segment (25 ans).
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\textwidth}
+  \centering
+  \img[\textwidth]{figures/deploy_01_jeunes_budget.png}
+  \caption{Profil (40 ans, 33 k\$, score 69).}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\textwidth}
+  \centering
+  \img[\textwidth]{figures/deploy_02_vip.png}
+  \caption{Profil (62 ans, 112 k\$, score 88).}
+\end{subfigure}
+\caption{Résultats de l'application pour deux profils de clients.}
+\label{fig:deploy-1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\textwidth}
+  \centering
+  \img[\textwidth]{figures/deploy_03_seniors.png}
+  \caption{Profil (73 ans, 82 k\$, score 50).}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\textwidth}
+  \centering
+  \img[\textwidth]{figures/deploy_04_en_ligne.png}
+  \caption{Application en ligne, adresse visible (54 ans, 102 k\$, score 84).}
+\end{subfigure}
+\caption{Résultats de l'application pour deux autres profils de clients.}
+\label{fig:deploy-2}
+\end{figure}
+
+% ==========================================================================
+% 12. LIMITES ET PERSPECTIVES
+% ==========================================================================
+\section{Limites et perspectives}
+
+\subsection{Limites}
+\begin{itemize}
+  \item \textbf{Taille réduite} : 200 clients seulement, données à visée pédagogique ; les résultats ne sont pas généralisables à un centre commercial réel sans nouvelles données.
+  \item \textbf{Silhouette modeste} ($0{,}43$) : les groupes se chevauchent en partie, en particulier les deux segments « modérés » qui ne diffèrent que par l'âge.
+  \item \textbf{Choix de $k$ non tranché} : $k=5$, $6$ et $7$ donnent des silhouettes proches ; le choix de $k=6$ s'appuie aussi sur l'interprétation.
+  \item \textbf{Score de dépenses} : variable fournie sans détail sur son mode de calcul.
+  \item \textbf{Profilage fragile} : les écarts de genre, d'études et de situation familiale reposent sur de petits effectifs.
+  \item \textbf{Recommandations} : ce sont des hypothèses, non des effets mesurés.
+\end{itemize}
+
+\subsection{Perspectives}
+\begin{itemize}
+  \item comparer le K-Means à d'autres méthodes (classification hiérarchique, modèles de mélange gaussien, DBSCAN) ;
+  \item tester la stabilité des segments (initialisations multiples, rééchantillonnage) et comparer explicitement $k=5$ et $k=6$ ;
+  \item valider les actions marketing par des campagnes pilotes mesurées ;
+  \item enrichir les données (montants d'achats, fréquence de visite, catégories de produits) ;
+  \item ajouter à l'application le chargement d'un fichier de clients et l'export des résultats.
+\end{itemize}
+
+% ==========================================================================
+% CONCLUSION
+% ==========================================================================
+\section{Conclusion}
+
+Ce projet a mené une démarche de data science de bout en bout : contrôle de la qualité des données, exploration visuelle, standardisation, choix argumenté du nombre de groupes, entraînement du modèle, interprétation métier, puis mise en ligne d'une application web de démonstration. Six segments de clientèle ont été identifiés et associés à des actions marketing. Le travail est reproductible grâce au dépôt versionné, au modèle sauvegardé et à l'application publique.
+
+Les limites sont assumées : un jeu de données modeste et des groupes qui se chevauchent en partie. Ce projet constitue une base solide, extensible à des données réelles et à des méthodes de clustering plus avancées, dans la continuité de ma formation en Master 2 de Data Science et Intelligence Artificielle à l'UNIKIN.
+
+% ==========================================================================
+% ANNEXES
+% ==========================================================================
+\appendix
+\section{Annexe : étapes principales du code}
+
+\subsection{Chargement et nettoyage}
+\begin{lstlisting}[language=Python]
+import pandas as pd
+df = pd.read_csv("data/Mall_Customers.csv")
+df.columns = df.columns.str.strip()
+\end{lstlisting}
+
+\subsection{Standardisation}
+\begin{lstlisting}[language=Python]
+from sklearn.preprocessing import StandardScaler
+
+features = ["Age", "Annual Income (k$)", "Spending Score (1-100)"]
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(df[features])
+\end{lstlisting}
+
+\subsection{Choix de $k$}
+\begin{lstlisting}[language=Python]
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+for k in range(2, 11):
+    km = KMeans(n_clusters=k, n_init=10, random_state=42)
+    labels = km.fit_predict(X_scaled)
+    print(k, km.inertia_, silhouette_score(X_scaled, labels))
+\end{lstlisting}
+
+\subsection{Entraînement et sauvegarde}
+\begin{lstlisting}[language=Python]
+import joblib
+
+kmeans = KMeans(n_clusters=6, n_init=10, random_state=42)
+df["Cluster"] = kmeans.fit_predict(X_scaled)
+
+joblib.dump(kmeans, "models/kmeans.joblib")
+joblib.dump(scaler, "models/scaler.joblib")
+\end{lstlisting}
+
+\section{Annexe : commandes de mise en ligne}
+\begin{lstlisting}[language=bash]
+# Environnement
+conda create -n segmentation python=3.11 -y
+conda activate segmentation
+pip install pandas numpy matplotlib seaborn scikit-learn jupyterlab streamlit joblib
+
+# Lancer l'application en local
+streamlit run app/app.py
+
+# Versionner et publier (GitLab puis GitHub)
+git add .
+git commit -m "Message du commit"
+git push
+git push github main
+\end{lstlisting}
+
+\end{document}
