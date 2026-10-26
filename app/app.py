@@ -93,13 +93,13 @@ with col_b:
         verdict = "Le client est plutôt dans ce segment."
     else:
         verdict = "Le client est à la frontière de deux segments."
-            st.markdown(f"**Segment voisin :** {SEGMENTS[second][0]}")
+    st.markdown(f"**Segment voisin :** {SEGMENTS[second][0]}")
     st.write(verdict)
     st.caption(f"Distance au segment : {distances[premier]:.2f} · au voisin : "
                f"{distances[second]:.2f} (unités standardisées). "
                "Seuils indicatifs : moins de 0,5 clair, de 0,5 à 0,8 plutôt, "
                "au-delà frontière.")
-
+    
 if clients is not None and "Cluster" in clients.columns:
     seuil = seuil_atypique(clients, kmeans, scaler, premier)
     if distances[premier] > seuil:
