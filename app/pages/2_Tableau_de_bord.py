@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -74,7 +74,14 @@ for colonne, nom, zone in [("Age", "Âge moyen", col2),
                 f"{ecart:+.1f} vs ensemble" if abs(ecart) >= 0.05 else None)
 
 st.subheader("Effectif par segment")
-st.bar_chart(vue["Segment"].value_counts())
+comptes = vue["Segment"].value_counts().rename_axis("Segment").reset_index(name="Clients")
+st.altair_chart(
+    alt.Chart(comptes).mark_bar().encode(
+        x=alt.X("Clients:Q", title="Nombre de clients"),
+        y=alt.Y("Segment:N", sort="-x", title=None),
+        tooltip=["Segment", "Clients"],
+    )
+)
 
 st.subheader("Profil moyen des segments")
 st.dataframe(profil_segments(vue))
